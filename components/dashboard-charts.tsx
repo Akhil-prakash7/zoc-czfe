@@ -261,9 +261,9 @@ export function DashboardCharts() {
                       data={chartData.categories}
                       cx="50%"
                       cy="50%"
-                      outerRadius={80}
+                      outerRadius={100}
                       dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}%`}
+                      label={({  value }) => ` ${value}%`}
                     >
                       {chartData.categories.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

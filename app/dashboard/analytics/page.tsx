@@ -146,7 +146,7 @@ export default function AnalyticsPage() {
                       color: "hsl(var(--chart-1))",
                     },
                   }}
-                  className="h-[400px]"
+                  className="h-[400px] w-full"
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={analyticsData.salesTrend}>
@@ -200,7 +200,7 @@ export default function AnalyticsPage() {
                         label: "Sales",
                       },
                     }}
-                    className="h-[300px]"
+                    className="h-[300px] w-full"
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -208,9 +208,9 @@ export default function AnalyticsPage() {
                           data={analyticsData.categoryBreakdown}
                           cx="50%"
                           cy="50%"
-                          outerRadius={80}
+                          outerRadius={100}
                           dataKey="value"
-                          label={({ name, percent=0 }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={({ percent=0 }) => ` ${(percent * 100).toFixed(0)}%`}
                         >
                           {analyticsData.categoryBreakdown.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -250,7 +250,7 @@ export default function AnalyticsPage() {
                         color: "hsl(var(--chart-2))",
                       },
                     }}
-                    className="h-[300px]"
+                    className="h-[300px] w-full"
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analyticsData.topItems} layout="horizontal">
@@ -292,7 +292,7 @@ export default function AnalyticsPage() {
                       color: "hsl(var(--chart-3))",
                     },
                   }}
-                  className="h-[300px]"
+                  className="h-[300px] w-full"
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={analyticsData.hourlyOrders}>
