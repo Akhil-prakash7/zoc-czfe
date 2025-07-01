@@ -84,7 +84,7 @@ export function AppSidebar() {
             <ShoppingCart className="h-5 w-5 text-white" />
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
-            <span className="text-xl font-bold text-white">Restaurant POS</span>
+            <span className="text-xl font-bold text-white">ZOC-CAFE</span>
             <p className="text-xs text-purple-200">Management System</p>
           </div>
         </div>
