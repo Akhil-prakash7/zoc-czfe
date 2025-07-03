@@ -94,7 +94,7 @@ export function DashboardCharts() {
 
   return (
     <div className="space-y-6">
-      {/* Filter Controls */}
+      
       <Card className="border-0 shadow-lg">
         <CardContent className="p-6">
           <div className="flex flex-wrap items-center gap-4">

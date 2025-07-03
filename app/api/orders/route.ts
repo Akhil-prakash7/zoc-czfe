@@ -1,13 +1,57 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/mongodb"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const page = Number.parseInt(searchParams.get("page") || "1")
+    const limit = Number.parseInt(searchParams.get("limit") || "10")
+    const status = searchParams.get("status")
+    const search = searchParams.get("search")
+    const dateFrom = searchParams.get("dateFrom")
+    const dateTo = searchParams.get("dateTo")
+
+    const skip = (page - 1) * limit
+
     const { db } = await connectToDatabase()
 
-    const orders = await db.collection("orders").find({}).sort({ createdAt: -1 }).toArray()
+    const filter: any = {}
 
-    return NextResponse.json(orders)
+    if (status && status !== "all") {
+      filter.status = status
+    }
+
+    if (search) {
+      filter.$or = [
+        { orderNumber: { $regex: search, $options: "i" } },
+        { customerName: { $regex: search, $options: "i" } },
+        { "items.name": { $regex: search, $options: "i" } },
+      ]
+    }
+
+    if (dateFrom || dateTo) {
+      filter.createdAt = {}
+      if (dateFrom) {
+        filter.createdAt.$gte = new Date(dateFrom)
+      }
+      if (dateTo) {
+        filter.createdAt.$lte = new Date(dateTo)
+      }
+    }
+
+    const total = await db.collection("orders").countDocuments(filter)
+
+    const orders = await db.collection("orders").find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray()
+
+    return NextResponse.json({
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    })
   } catch (error) {
     console.error("Failed to fetch orders:", error)
     return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 })
@@ -19,7 +63,6 @@ export async function POST(request: NextRequest) {
     const { db } = await connectToDatabase()
     const body = await request.json()
 
-    // Generate order number
     const orderCount = await db.collection("orders").countDocuments()
     const orderNumber = `ORD-${String(orderCount + 1).padStart(4, "0")}`
 

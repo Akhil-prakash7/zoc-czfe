@@ -51,7 +51,8 @@ export default function NewOrderPage() {
       const response = await fetch("/api/menu-items")
       if (response.ok) {
         const data = await response.json()
-        setMenuItems(data.filter((item: MenuItem) => item.available))
+        console.log(data,'dataaaaaaaaaaa')
+        setMenuItems(data.menuItems?.filter((item: MenuItem) => item.available))
       }
     } catch (error) {
       console.error("Failed to fetch menu items:", error)
@@ -254,7 +255,7 @@ export default function NewOrderPage() {
             </CardContent>
           </Card>
 
-          {/* Menu Items Grid - Scrollable */}
+          {/* Menu Items Grid and Table */}
           <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
             {categories
               .filter((category) => categoryFilter === "all" || categoryFilter === category)
@@ -348,10 +349,10 @@ export default function NewOrderPage() {
           </div>
         </div>
 
-        {/* Order Summary Sidebar - Fixed Height */}
-        <div className="flex flex-col h-full">
+        {/*  Sidebar  */}
+        <div className="flex flex-col h-full max-h-[calc(100vh-10rem)]">
           <Card className="h-full border-0 shadow-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex flex-col overflow-hidden">
-            {/* Fixed Header */}
+           
             <CardHeader className="pb-3 border-b flex-shrink-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900">
@@ -369,7 +370,7 @@ export default function NewOrderPage() {
               )}
             </CardHeader>
 
-            {/* Scrollable Content */}
+            {/*  Content */}
             <CardContent className="flex-1 overflow-y-auto p-4 custom-scrollbar">
               {orderItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -429,7 +430,7 @@ export default function NewOrderPage() {
               )}
             </CardContent>
 
-            {/* Fixed Footer */}
+            {/*  Footer */}
             {orderItems.length > 0 && (
               <div className="border-t bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 p-4 flex-shrink-0">
                 <div className="space-y-3">

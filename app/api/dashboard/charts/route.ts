@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // Get sales data with proper date formatting
+    //  sales 
     const salesData = await db
       .collection("orders")
       .aggregate([
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
       ])
       .toArray()
 
-    // Get category breakdown
+    //  category 
     const categoryData = await db
       .collection("orders")
       .aggregate([

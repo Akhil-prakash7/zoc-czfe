@@ -15,7 +15,6 @@ interface ReceiptProps {
   customerName: string
   items: ReceiptItem[]
   subtotal: number
-  tax: number
   total: number
   paymentMethod?: string
   createdAt: string
@@ -26,7 +25,6 @@ export function ReceiptGenerator({
   customerName,
   items,
   subtotal,
-  tax,
   total,
   paymentMethod = "Cash",
   createdAt,
@@ -53,7 +51,7 @@ export function ReceiptGenerator({
       </head>
       <body>
         <div class="header">
-          <h2>RESTAURANT POS</h2>
+          <h2>ZOC-CAFE</h2>
           <p>Thank you for your order!</p>
         </div>
         
@@ -82,10 +80,6 @@ export function ReceiptGenerator({
           <div class="total-line">
             <span>Subtotal:</span>
             <span>₹${subtotal.toFixed(2)}</span>
-          </div>
-          <div class="total-line">
-            <span>Tax:</span>
-            <span>₹${tax.toFixed(2)}</span>
           </div>
           <div class="total-line final-total">
             <span>Total:</span>

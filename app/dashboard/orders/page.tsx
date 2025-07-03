@@ -23,6 +23,7 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
+  Plus,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
@@ -36,6 +37,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import Link from "next/link"
 
 interface Order {
   _id: string
@@ -51,34 +53,57 @@ interface Order {
   createdAt: string
 }
 
-const ITEMS_PER_PAGE = 10
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  pages: number
+}
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0,
+  })
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState<Date>()
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards")
-  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchOrders()
-  }, [])
+  }, [pagination.page, statusFilter, dateFilter])
 
   useEffect(() => {
-    filterOrders()
-    setCurrentPage(1)
-  }, [orders, searchTerm, statusFilter, dateFilter])
+    
+    if (pagination.page !== 1) {
+      setPagination((prev) => ({ ...prev, page: 1 }))
+    } else {
+      fetchOrders()
+    }
+  }, [searchTerm, statusFilter, dateFilter])
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch("/api/orders")
+      setLoading(true)
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        ...(statusFilter !== "all" && { status: statusFilter }),
+        ...(searchTerm && { search: searchTerm }),
+        ...(dateFilter && { dateFrom: dateFilter.toISOString() }),
+      })
+
+      const response = await fetch(`/api/orders?${params}`)
       if (response.ok) {
         const data = await response.json()
-        setOrders(data)
+        setOrders(data.orders || [])
+        setPagination(data.pagination)
       }
     } catch (error) {
       console.error("Failed to fetch orders:", error)
@@ -92,30 +117,6 @@ export default function OrdersPage() {
     }
   }
 
-  const filterOrders = () => {
-    let filtered = orders
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (order) =>
-          order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.items.some((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
-      )
-    }
-
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((order) => order.status === statusFilter)
-    }
-
-    if (dateFilter) {
-      const filterDate = format(dateFilter, "yyyy-MM-dd")
-      filtered = filtered.filter((order) => format(new Date(order.createdAt), "yyyy-MM-dd") === filterDate)
-    }
-
-    setFilteredOrders(filtered)
-  }
-
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const response = await fetch(`/api/orders/${orderId}`, {
@@ -127,7 +128,7 @@ export default function OrdersPage() {
       })
 
       if (response.ok) {
-        setOrders(orders.map((order) => (order._id === orderId ? { ...order, status: newStatus as any } : order)))
+        fetchOrders() 
         toast({
           title: "Success",
           description: "Order status updated successfully",
@@ -146,7 +147,7 @@ export default function OrdersPage() {
   const exportOrders = () => {
     const csv = [
       ["Order Number", "Customer", "Items", "Total", "Status", "Date"].join(","),
-      ...filteredOrders.map((order) =>
+      ...orders.map((order) =>
         [
           order.orderNumber,
           order.customerName,
@@ -207,11 +208,9 @@ export default function OrdersPage() {
     }
   }
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const endIndex = startIndex + ITEMS_PER_PAGE
-  const currentOrders = filteredOrders.slice(startIndex, endIndex)
+  const handlePageChange = (newPage: number) => {
+    setPagination((prev) => ({ ...prev, page: newPage }))
+  }
 
   if (loading) {
     return (
@@ -226,87 +225,78 @@ export default function OrdersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Enhanced Filters */}
-      <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search orders, customers, or items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 rounded-xl border-purple-200 focus:border-purple-400"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[200px] rounded-xl">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Orders</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="preparing">Preparing</SelectItem>
-                <SelectItem value="ready">Ready</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-[200px] justify-start text-left font-normal rounded-xl",
-                    !dateFilter && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateFilter ? format(dateFilter, "PPP") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateFilter} onSelect={setDateFilter} initialFocus />
-              </PopoverContent>
-            </Popover>
-            <Button variant="outline" onClick={exportOrders} className="rounded-xl bg-transparent">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <div className="flex rounded-xl border">
-              <Button
-                variant={viewMode === "cards" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("cards")}
-                className="rounded-l-xl rounded-r-none"
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === "table" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("table")}
-                className="rounded-r-xl rounded-l-none"
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-            {(searchTerm || statusFilter !== "all" || dateFilter) && (
+      
+      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="flex flex-col sm:flex-row gap-4 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search orders..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 rounded-xl border-purple-200 focus:border-purple-400"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[200px] rounded-xl">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Orders</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="preparing">Preparing</SelectItem>
+              <SelectItem value="ready">Ready</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setSearchTerm("")
-                  setStatusFilter("all")
-                  setDateFilter(undefined)
-                }}
-                className="rounded-xl"
+                className={cn(
+                  "w-[200px] justify-start text-left font-normal rounded-xl",
+                  !dateFilter && "text-muted-foreground",
+                )}
               >
-                Clear Filters
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFilter ? format(dateFilter, "PPP") : "Pick a date"}
               </Button>
-            )}
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateFilter} onSelect={setDateFilter} initialFocus />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" onClick={exportOrders} className="rounded-xl bg-transparent">
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <div className="flex rounded-xl border">
+            <Button
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("cards")}
+              className="rounded-l-xl rounded-r-none"
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              className="rounded-r-xl rounded-l-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <Button asChild className="rounded-xl">
+          <Link href="/dashboard/orders/new">
+            <Plus className="h-4 w-4 mr-2" />
+            New Order
+          </Link>
+        </Button>
+      </div>
 
       {/* Orders Display */}
       {viewMode === "table" ? (
@@ -325,7 +315,7 @@ export default function OrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentOrders.map((order) => {
+                {orders.map((order) => {
                   const statusConfig = getStatusConfig(order.status)
                   const StatusIcon = statusConfig.icon
 
@@ -406,8 +396,7 @@ export default function OrdersPage() {
                                   orderNumber={order.orderNumber}
                                   customerName={order.customerName}
                                   items={order.items}
-                                  subtotal={order.total / 1.08}
-                                  tax={order.total - order.total / 1.08}
+                                  subtotal={order.total}
                                   total={order.total}
                                   createdAt={order.createdAt}
                                 />
@@ -424,9 +413,9 @@ export default function OrdersPage() {
           </CardContent>
         </Card>
       ) : (
-        /* Cards View */
+        
         <div className="grid gap-6">
-          {currentOrders.length === 0 ? (
+          {orders.length === 0 ? (
             <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <div className="p-4 rounded-full bg-muted/50 mb-4">
@@ -437,7 +426,7 @@ export default function OrdersPage() {
               </CardContent>
             </Card>
           ) : (
-            currentOrders.map((order) => {
+            orders.map((order) => {
               const statusConfig = getStatusConfig(order.status)
               const StatusIcon = statusConfig.icon
 
@@ -501,8 +490,7 @@ export default function OrdersPage() {
                           orderNumber={order.orderNumber}
                           customerName={order.customerName}
                           items={order.items}
-                          subtotal={order.total / 1.08}
-                          tax={order.total - order.total / 1.08}
+                          subtotal={order.total}
                           total={order.total}
                           createdAt={order.createdAt}
                         />
@@ -517,43 +505,46 @@ export default function OrdersPage() {
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {pagination.pages > 1 && (
         <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length}{" "}
-                orders
+                Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} orders
               </div>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
                   className="rounded-lg"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Previous
                 </Button>
                 <div className="flex items-center space-x-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                      className="w-8 h-8 p-0 rounded-lg"
-                    >
-                      {page}
-                    </Button>
-                  ))}
+                  {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                    const pageNum = i + 1
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pagination.page === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0 rounded-lg"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.pages}
                   className="rounded-lg"
                 >
                   Next

@@ -11,7 +11,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   }, [])
 
   if (!mounted) {
-    // Avoid rendering anything until mounted to prevent hydration mismatches
+    //for hydration error
     return null
   }
 

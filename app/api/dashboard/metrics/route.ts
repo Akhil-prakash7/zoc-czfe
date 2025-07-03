@@ -5,16 +5,16 @@ export async function GET() {
   try {
     const { db } = await connectToDatabase()
 
-    // Get today's date range
+    //  today's date range
     const today = new Date()
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000)
 
-    // Get yesterday's date range for comparison
+    //  yesterday's date range for comparison
     const yesterday = new Date(startOfDay.getTime() - 24 * 60 * 60 * 1000)
     const startOfYesterday = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate())
 
-    // Aggregate today's and yesterday's metrics
+    //   metrics
     const [todayResult, yesterdayResult, menuItemsCount] = await Promise.all([
       db
         .collection("orders")
@@ -69,7 +69,7 @@ export async function GET() {
       averageOrder: 0,
     }
 
-    // Calculate growth percentages
+    
     const salesGrowth =
       yesterdayMetrics.totalSales > 0
         ? ((todayMetrics.totalSales - yesterdayMetrics.totalSales) / yesterdayMetrics.totalSales) * 100
@@ -91,7 +91,7 @@ export async function GET() {
           ? 100
           : 0
 
-    // Get new menu items added today
+   
     const newItemsToday = await db.collection("menuItems").countDocuments({
       createdAt: { $gte: startOfDay, $lt: endOfDay },
     })

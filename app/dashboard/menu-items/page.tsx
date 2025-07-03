@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Edit, Trash2, Filter, Grid, List, Download } from "lucide-react"
+import { Search, Edit, Trash2, Filter, Grid, List, Download, Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -33,29 +33,57 @@ interface MenuItem {
   createdAt: string
 }
 
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  pages: number
+}
+
 export default function MenuItemsPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
-  const [filteredItems, setFilteredItems] = useState<MenuItem[]>([])
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0,
+  })
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [availabilityFilter, setAvailabilityFilter] = useState("all")
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchMenuItems()
-  }, [])
+  }, [pagination.page, categoryFilter, availabilityFilter])
 
   useEffect(() => {
-    filterItems()
-  }, [menuItems, searchTerm, categoryFilter])
+    
+    if (pagination.page !== 1) {
+      setPagination((prev) => ({ ...prev, page: 1 }))
+    } else {
+      fetchMenuItems()
+    }
+  }, [searchTerm])
 
   const fetchMenuItems = async () => {
     try {
-      const response = await fetch("/api/menu-items")
+      setLoading(true)
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        ...(categoryFilter !== "all" && { category: categoryFilter }),
+        ...(availabilityFilter !== "all" && { available: availabilityFilter === "available" ? "true" : "false" }),
+        ...(searchTerm && { search: searchTerm }),
+      })
+
+      const response = await fetch(`/api/menu-items?${params}`)
       if (response.ok) {
         const data = await response.json()
-        setMenuItems(data)
+        setMenuItems(data.menuItems || [])
+        setPagination(data.pagination)
       }
     } catch (error) {
       console.error("Failed to fetch menu items:", error)
@@ -69,24 +97,6 @@ export default function MenuItemsPage() {
     }
   }
 
-  const filterItems = () => {
-    let filtered = menuItems
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.description.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    }
-
-    if (categoryFilter !== "all") {
-      filtered = filtered.filter((item) => item.category === categoryFilter)
-    }
-
-    setFilteredItems(filtered)
-  }
-
   const toggleAvailability = async (itemId: string, available: boolean) => {
     try {
       const response = await fetch(`/api/menu-items/${itemId}`, {
@@ -98,7 +108,7 @@ export default function MenuItemsPage() {
       })
 
       if (response.ok) {
-        setMenuItems(menuItems.map((item) => (item._id === itemId ? { ...item, available } : item)))
+        fetchMenuItems() // Refresh the menu items list
         toast({
           title: "Success",
           description: `Item ${available ? "enabled" : "disabled"} successfully`,
@@ -121,7 +131,7 @@ export default function MenuItemsPage() {
       })
 
       if (response.ok) {
-        setMenuItems(menuItems.filter((item) => item._id !== itemId))
+        fetchMenuItems() // Refresh the menu items list
         toast({
           title: "Success",
           description: "Item deleted successfully",
@@ -140,7 +150,7 @@ export default function MenuItemsPage() {
   const exportItems = () => {
     const csv = [
       ["Name", "Price", "Category", "Description", "Available", "Created"].join(","),
-      ...filteredItems.map((item) =>
+      ...menuItems.map((item) =>
         [
           item.name,
           item.price.toFixed(2),
@@ -166,7 +176,12 @@ export default function MenuItemsPage() {
     })
   }
 
-  const categories = [...new Set(menuItems.map((item) => item.category))]
+  const handlePageChange = (newPage: number) => {
+    setPagination((prev) => ({ ...prev, page: newPage }))
+  }
+
+  //  unique categories for filter
+  const categories = Array.from(new Set(menuItems.map((item) => item.category)))
 
   if (loading) {
     return (
@@ -181,60 +196,74 @@ export default function MenuItemsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Filters */}
-      <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search menu items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 rounded-xl border-purple-200 focus:border-purple-400"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[200px] rounded-xl">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={exportItems} className="rounded-xl bg-transparent">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <div className="flex rounded-xl border">
-              <Button
-                variant={viewMode === "grid" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("grid")}
-                className="rounded-l-xl rounded-r-none"
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === "table" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("table")}
-                className="rounded-r-xl rounded-l-none"
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
+      
+      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="flex flex-col sm:flex-row gap-4 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search menu items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 rounded-xl border-purple-200 focus:border-purple-400"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[200px] rounded-xl">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter by category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+            <SelectTrigger className="w-[180px] rounded-xl">
+              <SelectValue placeholder="Availability" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Items</SelectItem>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="unavailable">Unavailable</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={exportItems} className="rounded-xl bg-transparent">
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <div className="flex rounded-xl border">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("grid")}
+              className="rounded-l-xl rounded-r-none"
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              className="rounded-r-xl rounded-l-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <Button asChild className="rounded-xl">
+          <Link href="/dashboard/menu-items/new">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Menu Item
+          </Link>
+        </Button>
+      </div>
 
-      {/* Content */}
+      
       {viewMode === "table" ? (
         <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
           <CardContent className="p-0">
@@ -250,7 +279,7 @@ export default function MenuItemsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((item) => (
+                {menuItems.map((item) => (
                   <TableRow key={item._id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>
@@ -312,7 +341,7 @@ export default function MenuItemsPage() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredItems.length === 0 ? (
+          {menuItems.length === 0 ? (
             <div className="col-span-full">
               <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
                 <CardContent className="flex flex-col items-center justify-center py-16">
@@ -328,7 +357,7 @@ export default function MenuItemsPage() {
               </Card>
             </div>
           ) : (
-            filteredItems.map((item) => (
+            menuItems.map((item) => (
               <Card
                 key={item._id}
                 className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm ${
@@ -400,6 +429,58 @@ export default function MenuItemsPage() {
             ))
           )}
         </div>
+      )}
+
+      {/*  Pagination */}
+      {pagination.pages > 1 && (
+        <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} items
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="rounded-lg"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                    const pageNum = i + 1
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pagination.page === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0 rounded-lg"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.pages}
+                  className="rounded-lg"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

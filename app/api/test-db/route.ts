@@ -7,36 +7,31 @@ export async function GET() {
 
     const { db } = await connectToDatabase()
 
-    // Test basic operations
-    const testCollection = db.collection("test")
-
-    // Insert a test document
-    const insertResult = await testCollection.insertOne({
-      test: true,
-      timestamp: new Date(),
-    })
-
-    // Read it back
-    const testDoc = await testCollection.findOne({ _id: insertResult.insertedId })
-
-    // Clean up
-    await testCollection.deleteOne({ _id: insertResult.insertedId })
+    const collections = await db.listCollections().toArray()
+    const stats = await db.stats()
 
     return NextResponse.json({
       success: true,
       message: "Database connection successful",
-      testDocument: testDoc,
       environment: process.env.NODE_ENV,
-      hasMongoUri: !!process.env.MONGODB_URI,
+      collections: collections.map((c) => c.name),
+      dbStats: {
+        collections: stats.collections,
+        objects: stats.objects,
+        dataSize: stats.dataSize,
+      },
+      timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error("Database test failed:", error)
+    console.error("Database connection test failed:", error)
+
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Database connection failed",
+        details: error instanceof Error ? error.message : "Unknown error",
         environment: process.env.NODE_ENV,
-        hasMongoUri: !!process.env.MONGODB_URI,
+        timestamp: new Date().toISOString(),
       },
       { status: 500 },
     )
